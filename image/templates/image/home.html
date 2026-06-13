@@ -1,0 +1,983 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Image Search Console</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f8fb;
+      --surface: #ffffff;
+      --surface-soft: #edf3f7;
+      --text: #14212b;
+      --muted: #5d6b78;
+      --line: #dbe3ea;
+      --primary: #156f7d;
+      --primary-strong: #0d4e59;
+      --accent: #b86f1f;
+      --danger: #b42318;
+      --ok: #247a4d;
+      --shadow: 0 12px 28px rgba(18, 33, 43, 0.08);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 15px;
+      line-height: 1.45;
+    }
+
+    a {
+      color: var(--primary);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+
+    button,
+    input,
+    select,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      min-height: 40px;
+      border: 0;
+      border-radius: 6px;
+      background: var(--primary);
+      color: #fff;
+      cursor: pointer;
+      font-weight: 700;
+      padding: 0 14px;
+    }
+
+    button:hover {
+      background: var(--primary-strong);
+    }
+
+    button.secondary {
+      background: #263845;
+    }
+
+    button.secondary:hover {
+      background: #17252e;
+    }
+
+    button.ghost {
+      background: transparent;
+      color: var(--primary);
+      border: 1px solid var(--line);
+    }
+
+    button.ghost:hover {
+      background: var(--surface-soft);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.62;
+    }
+
+    input,
+    select,
+    textarea {
+      width: 100%;
+      min-height: 40px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      color: var(--text);
+      padding: 8px 10px;
+    }
+
+    input:focus,
+    select:focus,
+    textarea:focus {
+      border-color: var(--primary);
+      box-shadow: 0 0 0 3px rgba(21, 111, 125, 0.14);
+      outline: none;
+    }
+
+    label {
+      display: grid;
+      gap: 6px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .page {
+      display: grid;
+      min-height: 100vh;
+      grid-template-rows: auto 1fr;
+    }
+
+    .topbar {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255, 255, 255, 0.94);
+      backdrop-filter: blur(10px);
+    }
+
+    .topbar-inner {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 18px;
+      align-items: center;
+      margin: 0 auto;
+      max-width: 1240px;
+      padding: 14px 20px;
+    }
+
+    .brand {
+      display: grid;
+      gap: 2px;
+      min-width: 0;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 22px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    .brand span,
+    .status-line {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .nav-links {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .nav-links a {
+      display: inline-flex;
+      min-height: 34px;
+      align-items: center;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #fff;
+      padding: 0 10px;
+      color: var(--text);
+      font-weight: 700;
+    }
+
+    .content {
+      display: grid;
+      grid-template-columns: 320px minmax(0, 1fr);
+      gap: 20px;
+      width: 100%;
+      max-width: 1240px;
+      margin: 0 auto;
+      padding: 22px 20px 36px;
+    }
+
+    .sidebar,
+    .main {
+      display: grid;
+      gap: 16px;
+      align-content: start;
+    }
+
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      min-height: 54px;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      border-bottom: 1px solid var(--line);
+      padding: 12px 14px;
+    }
+
+    .panel-header h2 {
+      margin: 0;
+      font-size: 16px;
+      line-height: 1.2;
+      letter-spacing: 0;
+    }
+
+    .panel-body {
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+    }
+
+    .stack {
+      display: grid;
+      gap: 10px;
+    }
+
+    .inline {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .split {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .tabs {
+      display: inline-grid;
+      grid-auto-flow: column;
+      gap: 2px;
+      border: 1px solid var(--line);
+      border-radius: 7px;
+      background: var(--surface-soft);
+      padding: 2px;
+    }
+
+    .tabs button {
+      min-height: 32px;
+      border-radius: 5px;
+      background: transparent;
+      color: var(--muted);
+      padding: 0 10px;
+    }
+
+    .tabs button.active {
+      background: #fff;
+      color: var(--text);
+      box-shadow: 0 1px 4px rgba(18, 33, 43, 0.08);
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .notice {
+      border: 1px solid var(--line);
+      border-left: 4px solid var(--primary);
+      border-radius: 6px;
+      background: #f8fbfc;
+      color: var(--muted);
+      padding: 10px 12px;
+      font-size: 13px;
+    }
+
+    .notice.error {
+      border-left-color: var(--danger);
+      color: var(--danger);
+    }
+
+    .notice.ok {
+      border-left-color: var(--ok);
+      color: var(--ok);
+    }
+
+    .result-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 12px;
+    }
+
+    .image-card {
+      display: grid;
+      gap: 10px;
+      min-width: 0;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 10px;
+    }
+
+    .image-card img {
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      border-radius: 6px;
+      background: var(--surface-soft);
+      object-fit: cover;
+    }
+
+    .image-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      min-width: 0;
+    }
+
+    .image-title strong {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .meta {
+      display: grid;
+      gap: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      overflow-wrap: anywhere;
+    }
+
+    .badge {
+      display: inline-flex;
+      width: fit-content;
+      max-width: 100%;
+      min-height: 24px;
+      align-items: center;
+      border-radius: 999px;
+      background: #e8f2f4;
+      color: var(--primary-strong);
+      font-size: 12px;
+      font-weight: 800;
+      padding: 2px 8px;
+      text-transform: uppercase;
+    }
+
+    .badge.warn {
+      background: #fff3df;
+      color: var(--accent);
+    }
+
+    .badge.error {
+      background: #fdeceb;
+      color: var(--danger);
+    }
+
+    .output {
+      min-height: 96px;
+      max-height: 320px;
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: #111a20;
+      color: #d7e4ea;
+      font-family: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      line-height: 1.5;
+      padding: 10px;
+      white-space: pre-wrap;
+      overflow-wrap: anywhere;
+    }
+
+    .dropzone {
+      display: grid;
+      gap: 8px;
+      border: 1px dashed #aebbc6;
+      border-radius: 8px;
+      background: #f8fbfc;
+      padding: 12px;
+    }
+
+    .dropzone input {
+      min-height: auto;
+      padding: 8px;
+    }
+
+    @media (max-width: 900px) {
+      .topbar-inner,
+      .content {
+        grid-template-columns: 1fr;
+      }
+
+      .nav-links {
+        justify-content: flex-start;
+      }
+    }
+
+    @media (max-width: 560px) {
+      .topbar-inner,
+      .content {
+        padding-left: 12px;
+        padding-right: 12px;
+      }
+
+      .split {
+        grid-template-columns: 1fr;
+      }
+
+      .panel-header {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+
+      .tabs {
+        width: 100%;
+      }
+
+      .tabs button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="topbar">
+      <div class="topbar-inner">
+        <div class="brand">
+          <h1>Image Search Console</h1>
+          <span id="healthStatus">Checking API...</span>
+        </div>
+        <nav class="nav-links" aria-label="Application links">
+          <a href="/admin/">Admin</a>
+        </nav>
+      </div>
+    </header>
+
+    <main class="content">
+      <aside class="sidebar">
+        <section class="panel" aria-labelledby="uploadTitle">
+          {% csrf_token %}
+          <div class="panel-header">
+            <h2 id="uploadTitle">Upload Flow</h2>
+          </div>
+          <div class="panel-body">
+            <label class="dropzone">
+              Image file
+              <input id="uploadFile" type="file" accept="image/jpeg,image/png,image/webp">
+            </label>
+            <div class="split">
+              <label>
+                Visibility
+                <select id="uploadVisibility">
+                  <option value="private">Private</option>
+                  <option value="public">Public</option>
+                </select>
+              </label>
+              <label>
+                Tags
+                <input id="uploadTags" placeholder="sku-1, front">
+              </label>
+            </div>
+            <div class="inline">
+              <button id="createUpload" type="button">Create</button>
+              <button class="secondary" id="putUpload" type="button" disabled>Upload</button>
+              <button class="ghost" id="completeUpload" type="button" disabled>Complete</button>
+            </div>
+            <label>
+              Image ID
+              <input id="activeImageId" placeholder="Created image id">
+            </label>
+            <div class="output" id="uploadOutput">No upload request yet.</div>
+          </div>
+        </section>
+      </aside>
+
+      <section class="main">
+        <section class="panel" aria-labelledby="libraryTitle">
+          <div class="panel-header">
+            <div>
+              <h2 id="libraryTitle">Image Library</h2>
+              <div class="status-line" id="librarySummary">Ready</div>
+            </div>
+            <div class="inline">
+              <button class="ghost" id="refreshImages" type="button">Refresh</button>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div class="inline">
+              <label>
+                Search
+                <input id="listSearch" placeholder="filename or tag">
+              </label>
+              <label>
+                Status
+                <select id="listStatus">
+                  <option value="">Any</option>
+                  <option value="upload_requested">Upload requested</option>
+                  <option value="uploaded">Uploaded</option>
+                  <option value="embedding_pending">Embedding pending</option>
+                  <option value="indexed">Indexed</option>
+                  <option value="failed">Failed</option>
+                </select>
+              </label>
+              <label>
+                Visibility
+                <select id="listVisibility">
+                  <option value="">Any</option>
+                  <option value="private">Private</option>
+                  <option value="public">Public</option>
+                </select>
+              </label>
+            </div>
+            <div class="notice hidden" id="libraryNotice"></div>
+            <div class="result-grid" id="imageList"></div>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="searchTitle">
+          <div class="panel-header">
+            <div>
+              <h2 id="searchTitle">Search</h2>
+              <div class="status-line" id="searchSummary">Image similarity</div>
+            </div>
+            <div class="tabs" role="tablist" aria-label="Search mode">
+              <button class="active" id="modeFile" type="button">File</button>
+              <button id="modeId" type="button">Image ID</button>
+            </div>
+          </div>
+          <div class="panel-body">
+            <div id="fileSearchFields" class="stack">
+              <label class="dropzone">
+                Query image
+                <input id="searchFile" type="file" accept="image/jpeg,image/png,image/webp">
+              </label>
+            </div>
+            <div id="idSearchFields" class="stack hidden">
+              <label>
+                Image ID
+                <input id="searchImageId" placeholder="Existing image id">
+              </label>
+            </div>
+            <div class="split">
+              <label>
+                Limit
+                <input id="searchLimit" type="number" min="1" max="100" value="10">
+              </label>
+              <label>
+                Text query
+                <input id="textQuery" placeholder="Returns 501 in image-only mode">
+              </label>
+            </div>
+            <div class="inline">
+              <button id="runImageSearch" type="button">Search Images</button>
+              <button class="ghost" id="runTextSearch" type="button">Search Text</button>
+            </div>
+            <div class="notice hidden" id="searchNotice"></div>
+            <div class="result-grid" id="searchResults"></div>
+          </div>
+        </section>
+
+        <section class="panel" aria-labelledby="statusTitle">
+          <div class="panel-header">
+            <h2 id="statusTitle">Status Lookup</h2>
+          </div>
+          <div class="panel-body">
+            <div class="inline">
+              <label>
+                Image ID
+                <input id="statusImageId" placeholder="Image id">
+              </label>
+              <button id="checkStatus" type="button">Check</button>
+            </div>
+            <div class="output" id="statusOutput">No status loaded.</div>
+          </div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const API_BASE = "/api/v1";
+    const state = {
+      upload: null,
+      searchMode: "file",
+    };
+
+    const elements = {
+      healthStatus: document.querySelector("#healthStatus"),
+      uploadFile: document.querySelector("#uploadFile"),
+      uploadVisibility: document.querySelector("#uploadVisibility"),
+      uploadTags: document.querySelector("#uploadTags"),
+      createUpload: document.querySelector("#createUpload"),
+      putUpload: document.querySelector("#putUpload"),
+      completeUpload: document.querySelector("#completeUpload"),
+      activeImageId: document.querySelector("#activeImageId"),
+      uploadOutput: document.querySelector("#uploadOutput"),
+      refreshImages: document.querySelector("#refreshImages"),
+      librarySummary: document.querySelector("#librarySummary"),
+      libraryNotice: document.querySelector("#libraryNotice"),
+      imageList: document.querySelector("#imageList"),
+      listSearch: document.querySelector("#listSearch"),
+      listStatus: document.querySelector("#listStatus"),
+      listVisibility: document.querySelector("#listVisibility"),
+      modeFile: document.querySelector("#modeFile"),
+      modeId: document.querySelector("#modeId"),
+      fileSearchFields: document.querySelector("#fileSearchFields"),
+      idSearchFields: document.querySelector("#idSearchFields"),
+      searchFile: document.querySelector("#searchFile"),
+      searchImageId: document.querySelector("#searchImageId"),
+      searchLimit: document.querySelector("#searchLimit"),
+      textQuery: document.querySelector("#textQuery"),
+      runImageSearch: document.querySelector("#runImageSearch"),
+      runTextSearch: document.querySelector("#runTextSearch"),
+      searchNotice: document.querySelector("#searchNotice"),
+      searchResults: document.querySelector("#searchResults"),
+      statusImageId: document.querySelector("#statusImageId"),
+      checkStatus: document.querySelector("#checkStatus"),
+      statusOutput: document.querySelector("#statusOutput"),
+    };
+
+    function csrfToken() {
+      const input = document.querySelector("[name=csrfmiddlewaretoken]");
+      if (input && input.value) {
+        return input.value;
+      }
+      const match = document.cookie.match(/(?:^|; )csrftoken=([^;]+)/);
+      return match ? decodeURIComponent(match[1]) : "";
+    }
+
+    function requestHeaders(headers = {}, method = "GET") {
+      const nextHeaders = { ...headers };
+      if (!["GET", "HEAD", "OPTIONS", "TRACE"].includes(method.toUpperCase())) {
+        const token = csrfToken();
+        if (token) {
+          nextHeaders["X-CSRFToken"] = token;
+        }
+      }
+      return nextHeaders;
+    }
+
+    async function apiFetch(path, options = {}) {
+      const method = options.method || "GET";
+      const response = await fetch(`${API_BASE}${path}`, {
+        ...options,
+        credentials: "same-origin",
+        headers: requestHeaders(options.headers || {}, method),
+      });
+      const text = await response.text();
+      const contentType = response.headers.get("content-type") || "";
+      const data = contentType.includes("application/json") && text ? JSON.parse(text) : text;
+      if (!response.ok) {
+        const detail = data && data.detail ? data.detail : text || response.statusText;
+        throw new Error(`${response.status} ${detail}`);
+      }
+      return data;
+    }
+
+    function showNotice(element, message, type = "") {
+      element.textContent = message;
+      element.className = `notice ${type}`.trim();
+      element.classList.remove("hidden");
+    }
+
+    function hideNotice(element) {
+      element.classList.add("hidden");
+    }
+
+    function pretty(data) {
+      return JSON.stringify(data, null, 2);
+    }
+
+    function tagsFromInput(value) {
+      return value
+        .split(",")
+        .map((tag) => tag.trim())
+        .filter(Boolean);
+    }
+
+    function statusBadge(status) {
+      if (status === "failed") {
+        return "badge error";
+      }
+      if (status !== "indexed") {
+        return "badge warn";
+      }
+      return "badge";
+    }
+
+    function renderImageCard(item, { score } = {}) {
+      const image = item.image || item;
+      const card = document.createElement("article");
+      card.className = "image-card";
+
+      const media = document.createElement("img");
+      media.alt = image.filename || "Image";
+      media.loading = "lazy";
+      media.src = image.thumbnail_url || image.download_url || "";
+      if (!media.src) {
+        media.classList.add("hidden");
+      }
+
+      const title = document.createElement("div");
+      title.className = "image-title";
+      const name = document.createElement("strong");
+      name.textContent = image.filename || image.id;
+      const badge = document.createElement("span");
+      badge.className = statusBadge(image.status);
+      badge.textContent = image.status || "unknown";
+      title.append(name, badge);
+
+      const meta = document.createElement("div");
+      meta.className = "meta";
+      const rows = [
+        `ID: ${image.id}`,
+        `Visibility: ${image.visibility || "n/a"}`,
+        `Size: ${image.size_bytes || 0} bytes`,
+      ];
+      if (score !== undefined) {
+        rows.unshift(`Score: ${Number(score).toFixed(4)}`);
+      }
+      if (Array.isArray(image.tags) && image.tags.length) {
+        rows.push(`Tags: ${image.tags.join(", ")}`);
+      }
+      meta.textContent = rows.join("\n");
+
+      const actions = document.createElement("div");
+      actions.className = "inline";
+
+      const useForSearch = document.createElement("button");
+      useForSearch.type = "button";
+      useForSearch.className = "ghost";
+      useForSearch.textContent = "Use";
+      useForSearch.addEventListener("click", () => {
+        elements.searchImageId.value = image.id;
+        elements.statusImageId.value = image.id;
+        elements.activeImageId.value = image.id;
+        setSearchMode("id");
+      });
+      actions.append(useForSearch);
+
+      if (image.download_url) {
+        const link = document.createElement("a");
+        link.href = image.download_url;
+        link.target = "_blank";
+        link.rel = "noreferrer";
+        link.textContent = "Open";
+        actions.append(link);
+      }
+
+      card.append(media, title, meta, actions);
+      return card;
+    }
+
+    function renderImages(container, items, emptyText, itemOptions = () => ({})) {
+      container.textContent = "";
+      if (!items.length) {
+        const notice = document.createElement("div");
+        notice.className = "notice";
+        notice.textContent = emptyText;
+        container.append(notice);
+        return;
+      }
+      items.forEach((item) => container.append(renderImageCard(item, itemOptions(item))));
+    }
+
+    async function checkHealth() {
+      try {
+        const response = await fetch("/health/");
+        const data = await response.json();
+        elements.healthStatus.textContent = `API ${data.status}`;
+      } catch (error) {
+        elements.healthStatus.textContent = "API unavailable";
+      }
+    }
+
+    async function loadImages() {
+      hideNotice(elements.libraryNotice);
+      elements.librarySummary.textContent = "Loading...";
+      const params = new URLSearchParams();
+      if (elements.listSearch.value.trim()) {
+        params.set("search", elements.listSearch.value.trim());
+      }
+      if (elements.listStatus.value) {
+        params.set("status", elements.listStatus.value);
+      }
+      if (elements.listVisibility.value) {
+        params.set("visibility", elements.listVisibility.value);
+      }
+      try {
+        const data = await apiFetch(`/images/?${params.toString()}`);
+        const results = data.results || [];
+        elements.librarySummary.textContent = `${results.length} shown`;
+        renderImages(elements.imageList, results, "No images found.");
+      } catch (error) {
+        elements.librarySummary.textContent = "Not loaded";
+        showNotice(elements.libraryNotice, error.message, "error");
+      }
+    }
+
+    async function createUploadRequest() {
+      const file = elements.uploadFile.files[0];
+      if (!file) {
+        elements.uploadOutput.textContent = "Select an image file first.";
+        return;
+      }
+      const payload = {
+        filename: file.name,
+        content_type: file.type || "application/octet-stream",
+        size_bytes: file.size,
+        visibility: elements.uploadVisibility.value,
+        tags: tagsFromInput(elements.uploadTags.value),
+      };
+      try {
+        const data = await apiFetch("/images/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        state.upload = data;
+        elements.activeImageId.value = data.image.id;
+        elements.putUpload.disabled = false;
+        elements.completeUpload.disabled = false;
+        elements.uploadOutput.textContent = pretty(data);
+      } catch (error) {
+        elements.uploadOutput.textContent = error.message;
+      }
+    }
+
+    async function uploadToStorage() {
+      const file = elements.uploadFile.files[0];
+      if (!file || !state.upload) {
+        elements.uploadOutput.textContent = "Create an upload request first.";
+        return;
+      }
+      const uploadHeaders = state.upload.upload_headers || {};
+      try {
+        const response = await fetch(state.upload.upload_url, {
+          method: "PUT",
+          headers: uploadHeaders,
+          body: file,
+        });
+        if (!response.ok) {
+          throw new Error(`${response.status} ${response.statusText}`);
+        }
+        elements.uploadOutput.textContent = "Storage upload complete.";
+      } catch (error) {
+        elements.uploadOutput.textContent = `Storage upload failed: ${error.message}`;
+      }
+    }
+
+    async function completeUpload() {
+      const imageId = elements.activeImageId.value.trim();
+      if (!imageId) {
+        elements.uploadOutput.textContent = "Provide an image id.";
+        return;
+      }
+      try {
+        const data = await apiFetch(`/images/${imageId}/complete/`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: "{}",
+        });
+        elements.uploadOutput.textContent = pretty(data);
+        elements.statusImageId.value = imageId;
+        loadImages();
+      } catch (error) {
+        elements.uploadOutput.textContent = error.message;
+      }
+    }
+
+    function setSearchMode(mode) {
+      state.searchMode = mode;
+      elements.modeFile.classList.toggle("active", mode === "file");
+      elements.modeId.classList.toggle("active", mode === "id");
+      elements.fileSearchFields.classList.toggle("hidden", mode !== "file");
+      elements.idSearchFields.classList.toggle("hidden", mode !== "id");
+    }
+
+    async function runImageSearch() {
+      hideNotice(elements.searchNotice);
+      elements.searchSummary.textContent = "Searching...";
+      const limit = elements.searchLimit.value || "10";
+      try {
+        let data;
+        if (state.searchMode === "id") {
+          const imageId = elements.searchImageId.value.trim();
+          if (!imageId) {
+            throw new Error("Provide an image id.");
+          }
+          data = await apiFetch("/search/image/", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ image_id: imageId, limit: Number(limit) }),
+          });
+        } else {
+          const file = elements.searchFile.files[0];
+          if (!file) {
+            throw new Error("Select a query image.");
+          }
+          const form = new FormData();
+          form.append("image", file);
+          form.append("limit", limit);
+          data = await apiFetch("/search/image/", {
+            method: "POST",
+            body: form,
+          });
+        }
+        const results = data.results || [];
+        elements.searchSummary.textContent = `${results.length} matches`;
+        renderImages(elements.searchResults, results, "No matches found.", (item) => ({ score: item.score }));
+      } catch (error) {
+        elements.searchSummary.textContent = "Search failed";
+        showNotice(elements.searchNotice, error.message, "error");
+      }
+    }
+
+    async function runTextSearch() {
+      hideNotice(elements.searchNotice);
+      const query = elements.textQuery.value.trim();
+      if (!query) {
+        showNotice(elements.searchNotice, "Provide a text query.", "error");
+        return;
+      }
+      try {
+        const data = await apiFetch("/search/text/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query, limit: Number(elements.searchLimit.value || 10) }),
+        });
+        showNotice(elements.searchNotice, pretty(data), "ok");
+      } catch (error) {
+        showNotice(elements.searchNotice, error.message, "error");
+      }
+    }
+
+    async function checkStatus() {
+      const imageId = elements.statusImageId.value.trim();
+      if (!imageId) {
+        elements.statusOutput.textContent = "Provide an image id.";
+        return;
+      }
+      try {
+        const data = await apiFetch(`/images/${imageId}/status/`);
+        elements.statusOutput.textContent = pretty(data);
+      } catch (error) {
+        elements.statusOutput.textContent = error.message;
+      }
+    }
+
+    elements.refreshImages.addEventListener("click", loadImages);
+    elements.createUpload.addEventListener("click", createUploadRequest);
+    elements.putUpload.addEventListener("click", uploadToStorage);
+    elements.completeUpload.addEventListener("click", completeUpload);
+    elements.modeFile.addEventListener("click", () => setSearchMode("file"));
+    elements.modeId.addEventListener("click", () => setSearchMode("id"));
+    elements.runImageSearch.addEventListener("click", runImageSearch);
+    elements.runTextSearch.addEventListener("click", runTextSearch);
+    elements.checkStatus.addEventListener("click", checkStatus);
+    elements.listSearch.addEventListener("input", () => {
+      clearTimeout(elements.listSearch.dataset.timer);
+      elements.listSearch.dataset.timer = setTimeout(loadImages, 250);
+    });
+    elements.listStatus.addEventListener("change", loadImages);
+    elements.listVisibility.addEventListener("change", loadImages);
+
+    checkHealth();
+    loadImages();
+  </script>
+</body>
+</html>

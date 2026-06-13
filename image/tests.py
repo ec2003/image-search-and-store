@@ -1,3 +1,4 @@
+import json
 from io import BytesIO, StringIO
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -6,7 +7,7 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.management import call_command
-from django.test import TestCase, override_settings
+from django.test import Client, TestCase, override_settings
 from rest_framework.test import APITestCase
 
 from .embeddings import EfficientNetV2EmbeddingProvider, clear_embedding_provider_cache, get_embedding_provider
@@ -83,6 +84,19 @@ class ImageApiTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         ids = {item["id"] for item in response.data["results"]}
         self.assertEqual(ids, {str(owned.id), str(public.id)})
+
+    def test_versioned_api_route_serves_v1(self):
+        response = self.client.get("/api/v1/images/")
+
+        self.assertEqual(response.status_code, 200)
+
+    def test_versioned_status_route_accepts_version_kwarg(self):
+        asset = self.make_asset(filename="status.jpg")
+
+        response = self.client.get(f"/api/v1/images/{asset.id}/status/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["id"], str(asset.id))
 
     @patch("image.views.index_image_asset.delay")
     @patch("image.views.get_storage_client")
@@ -162,6 +176,104 @@ class ImageApiTests(APITestCase):
         self.assertEqual(asset.status, ImageStatus.DELETED)
         storage.delete_objects.assert_called_once()
         vector.delete_image.assert_called_once_with(str(asset.id))
+
+
+class DocumentationTests(APITestCase):
+    def test_home_page_is_public(self):
+        response = self.client.get("/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, "Image Search Console")
+        self.assertContains(response, "/api/v1")
+
+    def test_swagger_ui_requires_admin(self):
+        response = self.client.get("/swagger/")
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_admin_can_access_openapi_schema(self):
+        admin = User.objects.create_superuser(username="admin", password="password")
+        self.client.force_authenticate(admin)
+
+        response = self.client.get("/swagger.json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["basePath"], "/api/v1")
+        self.assertEqual(response.data["info"]["version"], "v1")
+
+
+class PublicWebApiTests(APITestCase):
+    @patch("image.views.get_storage_client")
+    def test_anonymous_upload_request_uses_public_web_owner(self, storage_factory):
+        storage = Mock()
+        storage.build_object_key.return_value = "users/public/images/test.jpg"
+        storage.create_presigned_upload.return_value = Mock(
+            url="http://storage/upload",
+            headers={"Content-Type": "image/jpeg"},
+        )
+        storage_factory.return_value = storage
+
+        response = self.client.post(
+            "/api/v1/images/",
+            {
+                "filename": "test.jpg",
+                "content_type": "image/jpeg",
+                "size_bytes": 100,
+                "visibility": "private",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        image = ImageAsset.objects.get()
+        self.assertEqual(image.owner.username, settings.PUBLIC_WEB_USERNAME)
+
+    def test_anonymous_status_route_accepts_version_kwarg(self):
+        owner = User.objects.create_user(username=settings.PUBLIC_WEB_USERNAME)
+        asset = ImageAsset.objects.create(
+            owner=owner,
+            object_key="users/public/images/status.jpg",
+            filename="status.jpg",
+            content_type="image/jpeg",
+            size_bytes=100,
+            status=ImageStatus.INDEXED,
+        )
+
+        response = self.client.get(f"/api/v1/images/{asset.id}/status/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["id"], str(asset.id))
+
+    @patch("image.views.get_storage_client")
+    def test_session_post_accepts_csrf_token_from_home_page(self, storage_factory):
+        storage = Mock()
+        storage.build_object_key.return_value = "users/1/images/test.jpg"
+        storage.create_presigned_upload.return_value = Mock(
+            url="http://storage/upload",
+            headers={"Content-Type": "image/jpeg"},
+        )
+        storage_factory.return_value = storage
+        user = User.objects.create_user(username="browser", password="password")
+        client = Client(enforce_csrf_checks=True)
+        client.force_login(user)
+        client.get("/")
+        token = client.cookies["csrftoken"].value
+
+        response = client.post(
+            "/api/v1/images/",
+            data=json.dumps(
+                {
+                    "filename": "test.jpg",
+                    "content_type": "image/jpeg",
+                    "size_bytes": 100,
+                    "visibility": "private",
+                }
+            ),
+            content_type="application/json",
+            HTTP_X_CSRFTOKEN=token,
+        )
+
+        self.assertEqual(response.status_code, 201)
 
 
 class EmbeddingProviderTests(TestCase):

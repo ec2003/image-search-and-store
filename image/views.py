@@ -1,16 +1,17 @@
+from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.db.models import Q
-from uuid import uuid4
+from uuid import uuid7
 from rest_framework import mixins, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import AllowAny
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .embeddings import get_embedding_provider
 from .models import ImageAsset, ImageStatus, ImageVisibility
-from .permissions import IsOwnerOrPublicReadOnly
 from .serializers import (
     ImageAssetSerializer,
     ImageSearchSerializer,
@@ -24,6 +25,24 @@ from .tasks import index_image_asset
 from .vector import VectorMatch, get_vector_index
 
 
+def get_public_web_user():
+    user_model = get_user_model()
+    user, created = user_model.objects.get_or_create(
+        username=settings.PUBLIC_WEB_USERNAME,
+        defaults={"is_active": True},
+    )
+    if created:
+        user.set_unusable_password()
+        user.save(update_fields=["password"])
+    return user
+
+
+def get_request_owner(request):
+    if request.user and request.user.is_authenticated:
+        return request.user
+    return get_public_web_user()
+
+
 class ImageAssetViewSet(
     mixins.CreateModelMixin,
     mixins.ListModelMixin,
@@ -32,18 +51,23 @@ class ImageAssetViewSet(
     mixins.DestroyModelMixin,
     viewsets.GenericViewSet,
 ):
-    permission_classes = [IsAuthenticated, IsOwnerOrPublicReadOnly]
+    permission_classes = [AllowAny]
     filterset_fields = ["status", "visibility", "content_type"]
     search_fields = ["filename", "tags"]
     ordering_fields = ["created_at", "updated_at", "filename", "size_bytes"]
     ordering = ["-created_at"]
 
     def get_queryset(self):
-        user = self.request.user
+        if getattr(self, "swagger_fake_view", False):
+            return ImageAsset.objects.none()
+        owner = self.get_request_owner()
         return ImageAsset.objects.filter(
-            Q(owner=user)
+            Q(owner=owner)
             | Q(visibility=ImageVisibility.PUBLIC, status=ImageStatus.INDEXED)
         ).exclude(status=ImageStatus.DELETED)
+
+    def get_request_owner(self):
+        return get_request_owner(self.request)
 
     def get_serializer_class(self):
         if self.action == "create":
@@ -61,17 +85,18 @@ class ImageAssetViewSet(
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         storage = get_storage_client()
+        owner = self.get_request_owner()
 
         with transaction.atomic():
-            image_id = uuid4()
+            image_id = uuid7()
             object_key = storage.build_object_key(
-                owner_id=request.user.id,
+                owner_id=owner.id,
                 image_id=str(image_id),
                 filename=serializer.validated_data["filename"],
             )
             image = ImageAsset.objects.create(
                 id=image_id,
-                owner=request.user,
+                owner=owner,
                 object_key=object_key,
                 filename=serializer.validated_data["filename"],
                 content_type=serializer.validated_data["content_type"],
@@ -101,12 +126,12 @@ class ImageAssetViewSet(
         )
 
     @action(detail=True, methods=["post"])
-    def complete(self, request, pk=None):
+    def complete(self, request, pk=None, **kwargs):
         image = self.get_object()
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
 
-        if image.owner_id != request.user.id:
+        if image.owner_id != self.get_request_owner().id:
             return Response({"detail": "Only the owner can complete this upload."}, status=status.HTTP_403_FORBIDDEN)
         if image.status not in {ImageStatus.UPLOAD_REQUESTED, ImageStatus.FAILED}:
             return Response({"detail": f"Upload cannot be completed from status {image.status}."}, status=status.HTTP_409_CONFLICT)
@@ -126,12 +151,12 @@ class ImageAssetViewSet(
         return Response(ImageStatusSerializer(image).data)
 
     @action(detail=True, methods=["get"])
-    def status(self, request, pk=None):
+    def status(self, request, pk=None, **kwargs):
         return Response(ImageStatusSerializer(self.get_object()).data)
 
     def destroy(self, request, *args, **kwargs):
         image = self.get_object()
-        if image.owner_id != request.user.id:
+        if image.owner_id != self.get_request_owner().id:
             return Response({"detail": "Only the owner can delete this image."}, status=status.HTTP_403_FORBIDDEN)
 
         storage = get_storage_client()
@@ -143,10 +168,10 @@ class ImageAssetViewSet(
         return Response(status=status.HTTP_204_NO_CONTENT)
 
 
-def serialize_matches(matches: list[VectorMatch], *, request) -> list[dict]:
+def serialize_matches(matches: list[VectorMatch], *, request, owner) -> list[dict]:
     ids = [match.image_id for match in matches]
     assets = ImageAsset.objects.filter(id__in=ids, status=ImageStatus.INDEXED).filter(
-        Q(owner=request.user) | Q(visibility=ImageVisibility.PUBLIC)
+        Q(owner=owner) | Q(visibility=ImageVisibility.PUBLIC)
     )
     by_id = {str(asset.id): asset for asset in assets}
     ordered = [
@@ -158,9 +183,9 @@ def serialize_matches(matches: list[VectorMatch], *, request) -> list[dict]:
 
 
 class TextSearchView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
 
-    def post(self, request):
+    def post(self, request, **kwargs):
         return Response(
             {
                 "detail": (
@@ -173,16 +198,17 @@ class TextSearchView(APIView):
 
 
 class ImageSearchView(APIView):
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     parser_classes = [JSONParser, MultiPartParser, FormParser]
 
-    def post(self, request):
+    def post(self, request, **kwargs):
         serializer = ImageSearchSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
+        owner = get_request_owner(request)
 
         if serializer.validated_data.get("image_id"):
             image = ImageAsset.objects.filter(
-                Q(owner=request.user) | Q(visibility=ImageVisibility.PUBLIC, status=ImageStatus.INDEXED),
+                Q(owner=owner) | Q(visibility=ImageVisibility.PUBLIC, status=ImageStatus.INDEXED),
                 id=serializer.validated_data["image_id"],
             ).exclude(status=ImageStatus.DELETED).first()
             if image is None:
@@ -195,7 +221,7 @@ class ImageSearchView(APIView):
         vector = provider.embed_image_bytes(content)
         matches = get_vector_index().search(
             vector=vector,
-            user_id=request.user.id,
+            user_id=owner.id,
             limit=serializer.validated_data["limit"],
         )
-        return Response({"results": serialize_matches(matches, request=request)})
+        return Response({"results": serialize_matches(matches, request=request, owner=owner)})

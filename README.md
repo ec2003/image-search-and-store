@@ -40,6 +40,9 @@ docker compose down
 Default ports:
 
 - API: `http://localhost:8000`
+- Public home console: `http://localhost:8000/`
+- Admin-only Swagger UI: `http://localhost:8000/swagger/`
+- OpenAPI JSON/YAML: `http://localhost:8000/swagger.json`, `http://localhost:8000/swagger.yaml`
 - MinIO API: `http://localhost:9000`
 - MinIO console: `http://localhost:9001`
 - Qdrant: `http://localhost:6333`
@@ -48,10 +51,14 @@ Default ports:
 ## API Overview
 
 - `GET /health/`
-- `POST /api/images/` creates image metadata and returns a presigned upload URL.
-- `POST /api/images/{id}/complete/` confirms upload and queues indexing.
-- `GET /api/images/{id}/status/` returns ingestion status.
-- `POST /api/search/image/` searches by uploaded query image or existing `image_id`.
-- `POST /api/search/text/` returns `501 Not Implemented`; this deployment uses image-only EfficientNetV2 embeddings.
+- `POST /api/v1/images/` creates image metadata and returns a presigned upload URL.
+- `POST /api/v1/images/{id}/complete/` confirms upload and queues indexing.
+- `GET /api/v1/images/{id}/status/` returns ingestion status.
+- `POST /api/v1/search/image/` searches by uploaded query image or existing `image_id`.
+- `POST /api/v1/search/text/` returns `501 Not Implemented`; this deployment uses image-only EfficientNetV2 embeddings.
+
+The home console is public. Anonymous uploads and searches use the internal `PUBLIC_WEB_USERNAME` owner, which defaults to `public-web-user`. API docs are restricted to admin users, and the DRF browsable API renderer is disabled so direct API routes return JSON.
+
+The API uses DRF URL-path versioning. Version `v1` is the default, and the legacy `/api/` routes remain available as compatibility aliases for `/api/v1/`.
 
 When changing embedding models or dimensions, use a new `QDRANT_COLLECTION` or recreate the existing collection, then run `reindex_images`. EfficientNetV2 uses `image_assets_effnetv2_s_1280` by default.
