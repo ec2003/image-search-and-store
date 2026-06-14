@@ -1,0 +1,42 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Image Uploader</title>
+    <link rel="stylesheet" href="{% static 'frontend/css/style.css' %}" />
+</head>
+<body>
+    <div class="container">
+        <h1>📸 Image Uploader</h1>
+
+        <!-- Upload Card -->
+        <div class="card">
+            <h2>Upload an Image</h2>
+            <form id="uploadForm" class="upload-form">
+                <div class="form-group">
+                    <label for="name">Image Name</label>
+                    <input type="text" id="name" placeholder="e.g. My Photo" required />
+                </div>
+                <div class="form-group">
+                    <label for="image">Choose File</label>
+                    <input type="file" id="image" accept="image/*" required />
+                </div>
+                <button type="submit" class="btn btn-primary" id="uploadBtn">Upload</button>
+            </form>
+            <div id="uploadMessage"></div>
+        </div>
+
+        <!-- Gallery Card -->
+        <div class="card">
+            <h2>Image Gallery</h2>
+            <div id="gallery" class="gallery">
+                <div class="loading">Loading images...</div>
+            </div>
+        </div>
+    </div>
+
+    <script src="{% static 'frontend/js/app.js' %}"></script>
+</body>
+</html>
