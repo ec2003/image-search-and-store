@@ -61,19 +61,19 @@ This system allows you to upload images and search for visually similar images u
               │  Proxy  │  Port 80  (HTTP → HTTPS redirect)
               └────┬────┘
                    │
-        ┌──────────┼──────────────────────────┐
-        │          │                          │
+        ┌──────────┼─────────────────────────┐
+        │          │                         │
    ┌────▼────┐  ┌──▼────────┐          ┌─────▼──────┐
-   │ Django  │  │  MinIO    │          │  Celery     │
-   │  API    │  │  S3 API   │          │  Worker     │
-   │ :8000   │  │ :9000     │          │  (ml_tasks) │
-   └────┬────┘  └───────────┘          └─────┬───────┘
+   │ Django  │  │  MinIO    │          │  Celery    │
+   │  API    │  │  S3 API   │          │  Worker    │
+   │ :8000   │  │ :9000     │          │ (ml_tasks) │
+   └────┬────┘  └───────────┘          └─────┬──────┘
         │                                    │
-        ├──────────┬──────────────┐          │
-   ┌────▼────┐ ┌───▼──────┐ ┌────▼────┐ ┌───▼──────┐
+        ├───────────┬─────────────┐          │
+   ┌────▼─────┐ ┌───▼──────┐ ┌────▼────┐ ┌───▼──────┐
    │PostgreSQL│ │  Qdrant  │ │  Redis  │ │  Redis   │
    │Metadata  │ │ Vectors  │ │  Broker │ │  Backend │
-   └─────────┘ └──────────┘ └─────────┘ └──────────┘
+   └──────────┘ └──────────┘ └─────────┘ └──────────┘
 ```
 
 **Flow for uploading an image:**
@@ -110,8 +110,8 @@ MinIO runs inside the Docker network at `http://minio:9000`. Clients cannot reac
 **1. Clone the repository**
 
 ```bash
-git clone https://github.com/ec2003/image-vector-search-and-storage.git
-cd image-vector-search-and-storage
+git clone https://github.com/ec2003/image-search-and-storage.git
+cd image-search-and-storage
 ```
 
 **2. Configure environment variables**
