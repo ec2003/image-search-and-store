@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'celery',
     'embeddings',
     'images',
     'frontend',
@@ -79,12 +80,24 @@ WSGI_APPLICATION = 'config.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/6.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+if os.getenv("USE_SQLITE", "True") != "True":
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.postgresql',
+            'NAME': os.getenv("POSTGRES_DB", "image_search"),
+            'USER': os.getenv("POSTGRES_USER", "image_search"),
+            'PASSWORD': os.getenv("POSTGRES_PASSWORD", "image_search_password"),
+            'HOST': os.getenv("POSTGRES_HOST", "postgres"),
+            'PORT': os.getenv("POSTGRES_PORT", "5432"),
+        }
     }
-}
+else:
+    DATABASES = {
+        'default': {
+            'ENGINE': 'django.db.backends.sqlite3',
+            'NAME': BASE_DIR / 'db.sqlite3',
+        }
+    }
 
 
 # Password validation
@@ -130,7 +143,15 @@ STATICFILES_DIRS = [
 MEDIA_URL = '/media/'
 
 
-DEFAULT_FILE_STORAGE = 'storage.custom_s3.ExternalS3Storage'
+# Django 6.x uses STORAGES instead of DEFAULT_FILE_STORAGE
+STORAGES = {
+    "default": {
+        "BACKEND": "storage.custom_s3.ExternalS3Storage",
+    },
+    "staticfiles": {
+        "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
+    },
+}
 
 AWS_S3_ENDPOINT_URL = os.getenv("S3_ENDPOINT_URL", "http://minio:9000")
 AWS_ACCESS_KEY_ID = os.getenv("S3_ACCESS_KEY_ID", "minioadmin")
@@ -143,6 +164,15 @@ AWS_QUERYSTRING_AUTH = True
 # External S3 endpoint for presigned URLs (via Nginx reverse proxy)
 # e.g., https://minio.localhost (dev) or https://minio.example.com (prod)
 S3_EXTERNAL_ENDPOINT_URL = os.getenv("S3_EXTERNAL_ENDPOINT_URL", None)
+
+# Qdrant vector database
+QDRANT_URL = os.getenv("QDRANT_URL", "http://qdrant:6333")
+QDRANT_API_KEY = os.getenv("QDRANT_API_KEY", "")
+QDRANT_COLLECTION = os.getenv("QDRANT_COLLECTION", "image_assets_resnet50_2048")
+QDRANT_TIMEOUT_SECONDS = int(os.getenv("QDRANT_TIMEOUT_SECONDS", "5"))
+
+# Embedding model
+EMBEDDING_DIMENSIONS = int(os.getenv("EMBEDDING_DIMENSIONS", "2048"))
 
 # DRF Spectacular / Swagger
 SPECTACULAR_SETTINGS = {
@@ -171,6 +201,16 @@ REST_FRAMEWORK = {
         'rest_framework.authentication.BasicAuthentication',
     ],
 }
+
+# Celery — async task queue for ML embedding generation
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
+CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/1")
+CELERY_ACCEPT_CONTENT = ["json"]
+CELERY_TASK_SERIALIZER = "json"
+CELERY_RESULT_SERIALIZER = "json"
+CELERY_TASK_TRACK_STARTED = True
+CELERY_TASK_DEFAULT_QUEUE = "default"
+CELERY_WORKER_PREFETCH_MULTIPLIER = 1
 
 # CORS
 CORS_ALLOW_ALL_ORIGINS = True

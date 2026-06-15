@@ -4,37 +4,95 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Image Uploader</title>
+    <title>Image Vector Search</title>
     <link rel="stylesheet" href="{% static 'frontend/css/style.css' %}" />
 </head>
 <body>
-    <div class="container">
-        <h1>📸 Image Uploader</h1>
-
-        <!-- Upload Card -->
-        <div class="card">
-            <h2>Upload an Image</h2>
-            <form id="uploadForm" class="upload-form">
-                <div class="form-group">
-                    <label for="name">Image Name</label>
-                    <input type="text" id="name" placeholder="e.g. My Photo" required />
-                </div>
-                <div class="form-group">
-                    <label for="image">Choose File</label>
-                    <input type="file" id="image" accept="image/*" required />
-                </div>
-                <button type="submit" class="btn btn-primary" id="uploadBtn">Upload</button>
-            </form>
-            <div id="uploadMessage"></div>
-        </div>
-
-        <!-- Gallery Card -->
-        <div class="card">
-            <h2>Image Gallery</h2>
-            <div id="gallery" class="gallery">
-                <div class="loading">Loading images...</div>
+    <div class="app-layout">
+        <!-- ─── Sidebar ──────────────────────────── -->
+        <nav class="sidebar">
+            <div class="sidebar-header">
+                <h2>📸 IVS</h2>
+                <span class="sidebar-subtitle">Image Vector Search</span>
             </div>
-        </div>
+            <ul class="sidebar-nav">
+                <li class="nav-item active" data-tab="gallery">
+                    <span class="nav-icon">🏠</span>
+                    <span class="nav-label">Gallery</span>
+                </li>
+                <li class="nav-item" data-tab="upload">
+                    <span class="nav-icon">📤</span>
+                    <span class="nav-label">Upload Image</span>
+                </li>
+                <li class="nav-item" data-tab="search">
+                    <span class="nav-icon">🔍</span>
+                    <span class="nav-label">Search Images</span>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- ─── Main Content ──────────────────────── -->
+        <main class="main-content">
+
+            <!-- ═══ GALLERY TAB ═══ -->
+            <section id="tab-gallery" class="tab-content active">
+                <h1>Image Gallery</h1>
+                <div id="gallery" class="gallery">
+                    <div class="loading">Loading images...</div>
+                </div>
+                <div id="gallery-pagination" class="pagination"></div>
+            </section>
+
+            <!-- ═══ UPLOAD TAB ═══ -->
+            <section id="tab-upload" class="tab-content">
+                <h1>Upload an Image</h1>
+                <div class="card">
+                    <form id="uploadForm" class="upload-form">
+                        <div class="form-group">
+                            <label for="up-name">Image Name</label>
+                            <input type="text" id="up-name" placeholder="e.g. My Photo" required />
+                        </div>
+                        <div class="form-group">
+                            <label for="up-image">Choose File</label>
+                            <input type="file" id="up-image" accept="image/*" required />
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="uploadBtn">Upload</button>
+                    </form>
+                    <div id="uploadMessage"></div>
+                </div>
+                <!-- Upload status list -->
+                <div id="uploadStatusList" class="status-list"></div>
+            </section>
+
+            <!-- ═══ SEARCH TAB ═══ -->
+            <section id="tab-search" class="tab-content">
+                <h1>Search Similar Images</h1>
+                <div class="card">
+                    <form id="searchForm" class="upload-form">
+                        <div class="form-group">
+                            <label for="sr-image">Choose a query image</label>
+                            <input type="file" id="sr-image" accept="image/*" required />
+                        </div>
+                        <button type="submit" class="btn btn-primary" id="searchBtn">Search</button>
+                    </form>
+                    <div id="searchMessage"></div>
+                </div>
+
+                <!-- Search results -->
+                <div id="searchResults" class="search-results" style="display:none;">
+                    <div class="search-layout">
+                        <div class="query-preview">
+                            <h3>Query Image</h3>
+                            <img id="queryImagePreview" src="" alt="Query" />
+                        </div>
+                        <div class="results-grid" id="resultsGrid">
+                            <!-- Results rendered here -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
     </div>
 
     <script src="{% static 'frontend/js/app.js' %}"></script>
