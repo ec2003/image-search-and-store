@@ -4,86 +4,148 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Image Vector Search</title>
+    <title>Image Vector Search — Visual similarity search</title>
+    <meta name="description" content="Upload, store, and search images by visual similarity using deep learning embeddings." />
+    <meta property="og:title" content="Image Vector Search" />
+    <meta property="og:description" content="Upload, store, and search images by visual similarity using deep learning embeddings." />
+    <meta property="og:type" content="website" />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔍</text></svg>" />
     <link rel="stylesheet" href="{% static 'frontend/css/style.css' %}" />
 </head>
 <body>
+    <a href="#main-content" class="skip-link">Skip to main content</a>
+
     <div class="app-layout">
         <!-- ─── Sidebar ──────────────────────────── -->
-        <nav class="sidebar">
+        <nav class="sidebar" aria-label="Main navigation">
             <div class="sidebar-header">
-                <h2>📸 IVS</h2>
+                <h2>IVS</h2>
                 <span class="sidebar-subtitle">Image Vector Search</span>
             </div>
-            <ul class="sidebar-nav">
-                <li class="nav-item active" data-tab="gallery">
-                    <span class="nav-icon">🏠</span>
+            <ul class="sidebar-nav" role="tablist">
+                <li class="nav-item active" data-tab="gallery" role="tab" aria-selected="true" tabindex="0">
+                    <span class="nav-icon" aria-hidden="true">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <rect x="3" y="3" width="7" height="7" rx="1"/>
+                            <rect x="14" y="3" width="7" height="7" rx="1"/>
+                            <rect x="3" y="14" width="7" height="7" rx="1"/>
+                            <rect x="14" y="14" width="7" height="7" rx="1"/>
+                        </svg>
+                    </span>
                     <span class="nav-label">Gallery</span>
                 </li>
-                <li class="nav-item" data-tab="upload">
-                    <span class="nav-icon">📤</span>
-                    <span class="nav-label">Upload Image</span>
+                <li class="nav-item" data-tab="upload" role="tab" aria-selected="false" tabindex="-1">
+                    <span class="nav-icon" aria-hidden="true">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                            <polyline points="17 8 12 3 7 8"/>
+                            <line x1="12" y1="3" x2="12" y2="15"/>
+                        </svg>
+                    </span>
+                    <span class="nav-label">Upload</span>
                 </li>
-                <li class="nav-item" data-tab="search">
-                    <span class="nav-icon">🔍</span>
-                    <span class="nav-label">Search Images</span>
+                <li class="nav-item" data-tab="search" role="tab" aria-selected="false" tabindex="-1">
+                    <span class="nav-icon" aria-hidden="true">
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                            <circle cx="11" cy="11" r="8"/>
+                            <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                        </svg>
+                    </span>
+                    <span class="nav-label">Search</span>
                 </li>
             </ul>
         </nav>
 
         <!-- ─── Main Content ──────────────────────── -->
-        <main class="main-content">
+        <main class="main-content" id="main-content">
 
             <!-- ═══ GALLERY TAB ═══ -->
-            <section id="tab-gallery" class="tab-content active">
+            <section id="tab-gallery" class="tab-content active" role="tabpanel" aria-label="Gallery">
                 <h1>Image Gallery</h1>
-                <div id="gallery" class="gallery">
-                    <div class="loading">Loading images...</div>
+                <!-- Skeleton loader shown during initial load -->
+                <div id="gallery-skeleton" class="skeleton-grid">
+                    <div class="skeleton-card">
+                        <div class="skeleton skeleton-image"></div>
+                        <div class="skeleton-body">
+                            <div class="skeleton skeleton-text-short"></div>
+                            <div class="skeleton skeleton-text-long"></div>
+                            <div class="skeleton skeleton-text-meta"></div>
+                        </div>
+                    </div>
+                    <div class="skeleton-card">
+                        <div class="skeleton skeleton-image"></div>
+                        <div class="skeleton-body">
+                            <div class="skeleton skeleton-text-short"></div>
+                            <div class="skeleton skeleton-text-long"></div>
+                            <div class="skeleton skeleton-text-meta"></div>
+                        </div>
+                    </div>
+                    <div class="skeleton-card">
+                        <div class="skeleton skeleton-image"></div>
+                        <div class="skeleton-body">
+                            <div class="skeleton skeleton-text-short"></div>
+                            <div class="skeleton skeleton-text-long"></div>
+                            <div class="skeleton skeleton-text-meta"></div>
+                        </div>
+                    </div>
+                    <div class="skeleton-card">
+                        <div class="skeleton skeleton-image"></div>
+                        <div class="skeleton-body">
+                            <div class="skeleton skeleton-text-short"></div>
+                            <div class="skeleton skeleton-text-long"></div>
+                            <div class="skeleton skeleton-text-meta"></div>
+                        </div>
+                    </div>
                 </div>
-                <div id="gallery-pagination" class="pagination"></div>
+                <div id="gallery" class="gallery" style="display:none;"></div>
+                <div id="gallery-pagination" class="pagination" style="display:none;"></div>
             </section>
 
             <!-- ═══ UPLOAD TAB ═══ -->
-            <section id="tab-upload" class="tab-content">
-                <h1>Upload an Image</h1>
+            <section id="tab-upload" class="tab-content" role="tabpanel" aria-label="Upload image">
+                <h1>Upload an image</h1>
                 <div class="card">
-                    <form id="uploadForm" class="upload-form">
+                    <form id="uploadForm" class="upload-form" novalidate>
                         <div class="form-group">
-                            <label for="up-name">Image Name</label>
-                            <input type="text" id="up-name" placeholder="e.g. My Photo" required />
+                            <label for="up-name">Image name</label>
+                            <input type="text" id="up-name" placeholder="e.g. My Photo" required aria-required="true" />
                         </div>
                         <div class="form-group">
-                            <label for="up-image">Choose File</label>
-                            <input type="file" id="up-image" accept="image/*" required />
+                            <label for="up-image">Choose file</label>
+                            <input type="file" id="up-image" accept="image/*" required aria-required="true" />
                         </div>
-                        <button type="submit" class="btn btn-primary" id="uploadBtn">Upload</button>
+                        <button type="submit" class="btn btn-primary" id="uploadBtn">
+                            <span class="btn-text">Upload</span>
+                        </button>
                     </form>
-                    <div id="uploadMessage"></div>
+                    <div id="uploadMessage" class="message-box" style="display:none;"></div>
                 </div>
                 <!-- Upload status list -->
-                <div id="uploadStatusList" class="status-list"></div>
+                <div id="uploadStatusList" class="status-list" aria-live="polite" aria-relevant="additions"></div>
             </section>
 
             <!-- ═══ SEARCH TAB ═══ -->
-            <section id="tab-search" class="tab-content">
-                <h1>Search Similar Images</h1>
+            <section id="tab-search" class="tab-content" role="tabpanel" aria-label="Search images">
+                <h1>Search similar images</h1>
                 <div class="card">
-                    <form id="searchForm" class="upload-form">
+                    <form id="searchForm" class="upload-form" novalidate>
                         <div class="form-group">
                             <label for="sr-image">Choose a query image</label>
-                            <input type="file" id="sr-image" accept="image/*" required />
+                            <input type="file" id="sr-image" accept="image/*" required aria-required="true" />
                         </div>
-                        <button type="submit" class="btn btn-primary" id="searchBtn">Search</button>
+                        <button type="submit" class="btn btn-primary" id="searchBtn">
+                            <span class="btn-text">Search</span>
+                        </button>
                     </form>
-                    <div id="searchMessage"></div>
+                    <div id="searchMessage" class="message-box" style="display:none;"></div>
                 </div>
 
                 <!-- Search results -->
                 <div id="searchResults" class="search-results" style="display:none;">
                     <div class="search-layout">
                         <div class="query-preview">
-                            <h3>Query Image</h3>
-                            <img id="queryImagePreview" src="" alt="Query" />
+                            <h3>Query image</h3>
+                            <img id="queryImagePreview" src="" alt="" />
                         </div>
                         <div class="results-grid" id="resultsGrid">
                             <!-- Results rendered here -->
