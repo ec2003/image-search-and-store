@@ -10,6 +10,8 @@ A production-ready web application for uploading, storing, and searching images 
     - [What This Project Is](#what-this-project-is)
     - [Tech Stack](#tech-stack)
     - [System Design](#system-design)
+      - [Image Upload Flow (Async)](#image-upload-flow-async)
+      - [Image Search Flow (Sync)](#image-search-flow-sync)
   - [2. Installation \& Usage](#2-installation--usage)
     - [Prerequisites](#prerequisites)
     - [Installation Guide](#installation-guide)
@@ -51,50 +53,119 @@ This system allows you to upload images and search for visually similar images u
 
 ### System Design
 
+```mermaid
+graph TB
+    subgraph "Internet"
+        USER["Client Browser / curl"]
+    end
+
+    subgraph "Docker Network"
+        subgraph "Reverse Proxy"
+            NGINX["Nginx<br/>Port 443 HTTPS<br/>Port 80 HTTP → HTTPS"]
+        end
+
+        subgraph "Application Tier"
+            DJANGO["Django API<br/>Gunicorn :8000<br/>REST API + Frontend"]
+            CELERY["Celery Worker<br/>ml_tasks queue<br/>Embedding generation"]
+        end
+
+        subgraph "Data Tier"
+            PG[("PostgreSQL 16<br/>Image Metadata")]
+            QDRANT[("Qdrant<br/>Vector DB")]
+            REDIS[("Redis 7<br/>Broker + Backend")]
+        end
+
+        subgraph "Object Storage"
+            MINIO["MinIO<br/>S3 API :9000"]
+            MINIO_INIT["minio-init<br/>Bucket bootstrap"]
+        end
+
+        %% External connections
+        USER -->|"HTTPS :443"| NGINX
+
+        %% Nginx → Backend
+        NGINX -->|"/ → http://api:8000"| DJANGO
+        NGINX -->|"/pictures → http://minio:9000"| MINIO
+
+        %% Django → Data
+        DJANGO -->|"Metadata CRUD"| PG
+        DJANGO -->|"Vector search"| QDRANT
+        DJANGO -->|"Async task dispatch"| REDIS
+
+        %% Celery → Data
+        CELERY -->|"Read image bytes"| MINIO
+        CELERY -->|"Store embedding"| QDRANT
+        CELERY -->|"Mark vectorized"| PG
+        CELERY -->|"Task broker"| REDIS
+
+        %% MinIO init
+        MINIO_INIT --->|"Create bucket"| MINIO
+    end
+
+    style USER fill:#4a9eff,stroke:#2d7dd2,color:#fff
+    style NGINX fill:#009639,stroke:#006b27,color:#fff
+    style DJANGO fill:#092e20,stroke:#061f15,color:#fff
+    style CELERY fill:#37814a,stroke:#255d34,color:#fff
+    style PG fill:#336791,stroke:#244e6a,color:#fff
+    style QDRANT fill:#e2007a,stroke:#b3005f,color:#fff
+    style REDIS fill:#a41e11,stroke:#7a1410,color:#fff
+    style MINIO fill:#c72c48,stroke:#a12238,color:#fff
+    style MINIO_INIT fill:#c72c48,stroke:#a12238,color:#fff
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                              Internet                                       │
-└──────────────────┬──────────────────────────────────────────────────────────┘
-                   │
-              ┌────▼────┐
-              │  Nginx  │  Port 443 (HTTPS)
-              │  Proxy  │  Port 80  (HTTP → HTTPS redirect)
-              └────┬────┘
-                   │
-        ┌──────────┼─────────────────────────┐
-        │          │                         │
-   ┌────▼────┐  ┌──▼────────┐          ┌─────▼──────┐
-   │ Django  │  │  MinIO    │          │  Celery    │
-   │  API    │  │  S3 API   │          │  Worker    │
-   │ :8000   │  │ :9000     │          │ (ml_tasks) │
-   └────┬────┘  └───────────┘          └─────┬──────┘
-        │                                    │
-        ├───────────┬─────────────┐          │
-   ┌────▼─────┐ ┌───▼──────┐ ┌────▼────┐ ┌───▼──────┐
-   │PostgreSQL│ │  Qdrant  │ │  Redis  │ │  Redis   │
-   │Metadata  │ │ Vectors  │ │  Broker │ │  Backend │
-   └──────────┘ └──────────┘ └─────────┘ └──────────┘
+
+#### Image Upload Flow (Async)
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Nginx
+    participant Django
+    participant MinIO
+    participant PostgreSQL
+    participant Redis
+    participant Celery
+    participant Qdrant
+
+    Client->>Nginx: POST /api/v1/images/upload/ (image + name)
+    Nginx->>Django: Reverse proxy
+    Django->>MinIO: Save image file
+    Django->>PostgreSQL: INSERT metadata (vectorized=False)
+    Django->>Redis: Dispatch generate_embedding task
+    Django-->>Nginx: 201 Created (metadata + presigned URL)
+    Nginx-->>Client: JSON response
+
+    Note over Celery,Qdrant: Async (seconds later)
+    Celery->>Redis: Pick up task
+    Celery->>MinIO: Read image bytes
+    Celery->>Celery: ResNet50 → 2048-dim vector
+    Celery->>Qdrant: Upsert vector
+    Celery->>PostgreSQL: UPDATE vectorized=True
 ```
 
-**Flow for uploading an image:**
+#### Image Search Flow (Sync)
 
-1. User uploads an image via the Django REST API (`POST /api/v1/images/upload/`).
-2. Django saves the image to **MinIO** and metadata to **PostgreSQL**.
-3. Django dispatches a Celery task to the **ml_tasks** queue via **Redis**.
-4. The **Celery worker** picks up the task, loads the image bytes from MinIO, runs it through the cached **ResNet50** model, and stores the resulting embedding vector in **Qdrant**.
-5. The record is marked as `vectorized = True` in PostgreSQL.
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Nginx
+    participant Django
+    participant MinIO
+    participant Qdrant
+    participant PostgreSQL
 
-**Flow for searching by similarity:**
+    Client->>Nginx: POST /api/v1/images/search/ (query_image + limit)
+    Nginx->>Django: Reverse proxy
+    Django->>MinIO: Save query image (temp, for display)
+    Note over Django: ResNet50 → 2048-dim vector (synchronous)
+    Django->>Qdrant: Cosine similarity search
+    Django->>PostgreSQL: SELECT metadata WHERE id IN (matched_ids)
+    Django-->>Nginx: 200 OK (results + presigned URLs)
+    Nginx-->>Client: JSON response
+```
 
-1. User uploads a query image (`POST /api/v1/images/search/`).
-2. Django generates the query embedding **synchronously** (lightweight, single image).
-3. Qdrant performs a **cosine similarity search** against all stored vectors.
-4. Matching image metadata is fetched from PostgreSQL and returned with presigned URLs.
-
-**Why the custom S3 storage (`ExternalS3Storage`)?**
-
-MinIO runs inside the Docker network at `http://minio:9000`. Clients cannot reach that address from outside. Nginx reverse-proxies MinIO at `https://minio.localhost`. The custom storage backend generates presigned URLs using the internal endpoint and then substitutes the host portion with the external one — without mutating shared state, which eliminates race conditions in multi-worker Gunicorn environments.
-
+> **Why the custom S3 storage (`ExternalS3Storage`)?**
+>
+> MinIO runs inside the Docker network at `http://minio:9000`. Clients cannot reach that address from outside. Nginx reverse-proxies MinIO at `https://minio.localhost`. The custom storage backend generates presigned URLs using the internal endpoint and then substitutes the host portion with the external one — without mutating shared state, which eliminates race conditions in multi-worker Gunicorn environments.
 ---
 
 ## 2. Installation & Usage
