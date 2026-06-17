@@ -196,69 +196,96 @@ window.goToPage = function(page) {
 };
 
 // ════════════════════════════════════════════════════
-// UPLOAD
+// UPLOAD — supports multiple files (sequential)
 // ════════════════════════════════════════════════════
 document.getElementById('uploadForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     if (state.uploading) return;
 
     const fileInput = document.getElementById('up-image');
-    const file = fileInput.files[0];
+    const files = Array.from(fileInput.files);
     const msg = document.getElementById('uploadMessage');
     const btn = document.getElementById('uploadBtn');
     const btnText = btn.querySelector('.btn-text');
 
-    if (!file) {
-        showMessage(msg, 'error', 'Please select an image to upload.');
+    if (files.length === 0) {
+        showMessage(msg, 'error', 'Please select at least one image to upload.');
         fileInput.focus();
         return;
     }
-    if (file.size > 50 * 1024 * 1024) {
-        showMessage(msg, 'error', 'File is too large. Maximum size is 50 MB.');
-        return;
+
+    // Validate all files first
+    for (const file of files) {
+        if (file.size > 50 * 1024 * 1024) {
+            showMessage(msg, 'error', `"${file.name}" is too large. Maximum size is 50 MB.`);
+            return;
+        }
     }
 
     hideMessage(msg);
 
-    const formData = new FormData();
-    formData.append('image', file);
-
     state.uploading = true;
     btn.disabled = true;
-    btnText.textContent = 'Uploading...';
+    btnText.textContent = `Uploading 0 / ${files.length}`;
 
-    // Add a pending status item immediately
-    const tempId = 'temp-' + Date.now();
-    addStatusItem(tempId, file.name, null, 'pending');
+    let successCount = 0;
+    let failCount = 0;
+    const tempIds = [];
 
-    try {
-        const res = await fetch(`${API_BASE}/images/upload/`, {
-            method: 'POST',
-            body: formData,
-        });
-        if (!res.ok) {
-            const errData = await res.json();
-            throw new Error(errData.detail || JSON.stringify(errData));
+    // Create a pending status item for every file
+    files.forEach((file, idx) => {
+        const tempId = 'temp-' + Date.now() + '-' + idx;
+        tempIds.push(tempId);
+        addStatusItem(tempId, file.name, null, 'pending');
+    });
+
+    // Upload files sequentially
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const tempId = tempIds[i];
+        btnText.textContent = `Uploading ${i + 1} / ${files.length}`;
+
+        const formData = new FormData();
+        formData.append('image', file);
+
+        try {
+            const res = await fetch(`${API_BASE}/images/upload/`, {
+                method: 'POST',
+                body: formData,
+            });
+            if (!res.ok) {
+                const errData = await res.json();
+                throw new Error(errData.detail || JSON.stringify(errData));
+            }
+            const result = await res.json();
+            successCount++;
+
+            // Update status to vectorizing
+            updateStatusItem(tempId, result.id, result.name, result.image_url, 'vectorizing');
+
+            // Poll for vectorized status
+            pollVectorization(result.id, tempId);
+
+        } catch (err) {
+            failCount++;
+            updateStatusItem(tempId, null, file.name, null, 'error');
+            console.error('Upload error for', file.name, ':', err);
         }
-        const result = await res.json();
-        showMessage(msg, 'success', 'Uploaded successfully');
-        document.getElementById('uploadForm').reset();
-
-        // Update status to vectorizing
-        updateStatusItem(tempId, result.id, result.name, result.image_url, 'vectorizing');
-
-        // Poll for vectorized status
-        pollVectorization(result.id, tempId);
-
-    } catch (err) {
-        updateStatusItem(tempId, null, file.name, null, 'error');
-        showMessage(msg, 'error', 'Upload failed: ' + err.message);
-        console.error('Upload error:', err);
-    } finally {
-        state.uploading = false;
-        btn.disabled = false;
-        btnText.textContent = 'Upload';
     }
+
+    // Show summary
+    if (failCount === 0) {
+        showMessage(msg, 'success', `All ${successCount} file${successCount > 1 ? 's' : ''} uploaded successfully`);
+    } else {
+        showMessage(msg, 'error', `${successCount} uploaded, ${failCount} failed`);
+    }
+
+    // Reset the form so the same files can be picked again
+    document.getElementById('uploadForm').reset();
+
+    state.uploading = false;
+    btn.disabled = false;
+    btnText.textContent = 'Upload';
 });
 
 function addStatusItem(id, name, imageUrl, status) {
