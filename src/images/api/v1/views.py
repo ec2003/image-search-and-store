@@ -59,10 +59,10 @@ class ImageViewSet(
         serializer.is_valid(raise_exception=True)
 
         image_file = serializer.validated_data["image"]
-        name = serializer.validated_data["name"]
+        # name = serializer.validated_data["name"]
 
         metadata = ImageMetadata(
-            name=name,
+            # name=name,
             image=image_file,
             file_size=image_file.size,
             vectorized=False,

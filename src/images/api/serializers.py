@@ -19,7 +19,7 @@ class ImageMetadataSerializer(serializers.ModelSerializer):
 
 
 class ImageUploadSerializer(serializers.Serializer):
-    name = serializers.CharField(max_length=255)
+    name = serializers.CharField(max_length=255, required=False, allow_blank=True)
     image = serializers.ImageField()
 
 

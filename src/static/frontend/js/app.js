@@ -76,7 +76,7 @@ function switchTab(tab) {
 
     // Lazy load
     if (tab === 'gallery') renderGallery(state.galleryPage);
-    if (tab === 'upload') document.getElementById('up-name').focus();
+    if (tab === 'upload') document.getElementById('up-image').focus();
 }
 
 // Keyboard navigation for tabs
@@ -202,19 +202,12 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     if (state.uploading) return;
 
-    const name = document.getElementById('up-name').value.trim();
     const fileInput = document.getElementById('up-image');
     const file = fileInput.files[0];
     const msg = document.getElementById('uploadMessage');
     const btn = document.getElementById('uploadBtn');
     const btnText = btn.querySelector('.btn-text');
 
-    // Client-side validation
-    if (!name) {
-        showMessage(msg, 'error', 'Please provide a name for the image.');
-        document.getElementById('up-name').focus();
-        return;
-    }
     if (!file) {
         showMessage(msg, 'error', 'Please select an image to upload.');
         fileInput.focus();
@@ -228,7 +221,6 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
     hideMessage(msg);
 
     const formData = new FormData();
-    formData.append('name', name);
     formData.append('image', file);
 
     state.uploading = true;
@@ -259,7 +251,7 @@ document.getElementById('uploadForm').addEventListener('submit', async (e) => {
         pollVectorization(result.id, tempId);
 
     } catch (err) {
-        updateStatusItem(tempId, null, name, null, 'error');
+        updateStatusItem(tempId, null, file.name, null, 'error');
         showMessage(msg, 'error', 'Upload failed: ' + err.message);
         console.error('Upload error:', err);
     } finally {
