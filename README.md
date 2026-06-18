@@ -17,6 +17,7 @@ A production-ready web application for uploading, storing, and searching images 
     - [Installation Guide](#installation-guide)
     - [Usage Example](#usage-example)
   - [3. License](#3-license)
+  - [4. Special Thanks](#4-special-thanks)
 
 ---
 
