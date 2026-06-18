@@ -383,3 +383,9 @@ limitations under the License.
 ```
 
 See the [LICENSE](LICENSE) file for details.
+
+---
+
+## 4. Special Thanks
+
+Special thanks to my friend [truong51972](https://github.com/truong51972) for supervising and supporting by providing system design knowledges in order to complete this project.
