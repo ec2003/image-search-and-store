@@ -202,8 +202,17 @@ REST_FRAMEWORK = {
     ],
 }
 
+# Cache — Redis db 2 (search results, Qdrant collection check, presigned URLs)
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": os.getenv("REDIS_CACHE_URL", "redis://redis:6379/2"),
+    }
+}
+
 # Celery — async task queue for ML embedding generation
-CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
+# Broker: RabbitMQ; Result backend: Redis db 1
+CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "amqp://guest:guest@rabbitmq:5672//")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/1")
 CELERY_ACCEPT_CONTENT = ["json"]
 CELERY_TASK_SERIALIZER = "json"

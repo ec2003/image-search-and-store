@@ -44,13 +44,33 @@ services:
     restart: unless-stopped
 
   # ──────────────────────────────────────────
-  # Redis — message broker for Celery
+  # Redis — Celery result backend (db 1) + application cache (db 2)
   # ──────────────────────────────────────────
   redis:
     image: redis:7-alpine
     container_name: redis
     expose:
       - "6379"
+    restart: unless-stopped
+
+  # ──────────────────────────────────────────
+  # RabbitMQ — message broker for Celery
+  # ──────────────────────────────────────────
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    container_name: rabbitmq
+    expose:
+      - "5672"   # AMQP protocol (internal only)
+    ports:
+      - "127.0.0.1:15672:15672"   # Management UI — localhost only, dev use
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER:-guest}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS:-guest}
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "check_port_connectivity"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
   # ──────────────────────────────────────────
@@ -151,6 +171,8 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
     volumes:
       - static_volume:/app/src/staticfiles
       - ./src:/app/src
@@ -188,6 +210,8 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_started
+      rabbitmq:
+        condition: service_healthy
     volumes:
       - ./src:/app/src
     command: >

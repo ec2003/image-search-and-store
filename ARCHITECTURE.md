@@ -4,13 +4,14 @@
 
 **Image Vector Search and Storage** is a fully containerized web application that enables users to upload images and search for visually similar images using **content-based image retrieval (CBIR)**. Each image is represented by a **2048-dimensional feature vector** extracted from a pre-trained **ResNet50** neural network. These vectors are stored in **Qdrant** (a vector database), enabling fast similarity search via cosine distance.
 
-The system follows a **microservices-like architecture** orchestrated with Docker Compose, consisting of 8 containers working together:
+The system follows a **microservices-like architecture** orchestrated with Docker Compose, consisting of 9 containers working together:
 
 | Container          | Purpose                                                |
 | ------------------ | ------------------------------------------------------ |
 | `nginx-proxy`      | SSL termination, reverse proxy to Django & MinIO       |
 | `postgres`         | Image metadata database (PostgreSQL 16)                |
-| `redis`            | Celery message broker (db 0) + result backend (db 1)   |
+| `redis`            | Celery result backend (db 1) + application cache (db 2) |
+| `rabbitmq`         | Celery message broker (AMQP)                            |
 | `qdrant`           | Vector database for image embeddings                   |
 | `minio`            | S3-compatible object storage for images                |
 | `minio-init`       | One-shot bootstrap — creates the S3 bucket             |
@@ -40,7 +41,8 @@ graph TB
         subgraph "Data Tier"
             PG[("PostgreSQL 16<br/>Image Metadata")]
             QDRANT[("Qdrant<br/>Vector DB")]
-            REDIS[("Redis 7<br/>Broker + Backend")]
+            REDIS[("Redis 7<br/>Result Backend + Cache")]
+            RABBITMQ[("RabbitMQ<br/>Message Broker")]
         end
 
         subgraph "Object Storage"
@@ -58,13 +60,14 @@ graph TB
         %% Django → Data
         DJANGO -->|"Metadata CRUD"| PG
         DJANGO -->|"Vector search"| QDRANT
-        DJANGO -->|"Async task dispatch"| REDIS
+        DJANGO -->|"Async task dispatch"| RABBITMQ
 
         %% Celery → Data
         CELERY -->|"Read image bytes"| MINIO
         CELERY -->|"Store embedding"| QDRANT
         CELERY -->|"Mark vectorized"| PG
-        CELERY -->|"Task broker"| REDIS
+        CELERY -->|"Task broker"| RABBITMQ
+        CELERY -->|"Result backend"| REDIS
 
         %% MinIO init
         MINIO_INIT --->|"Create bucket"| MINIO
@@ -77,6 +80,7 @@ graph TB
     style PG fill:#336791,stroke:#244e6a,color:#fff
     style QDRANT fill:#e2007a,stroke:#b3005f,color:#fff
     style REDIS fill:#a41e11,stroke:#7a1410,color:#fff
+    style RABBITMQ fill:#ff6600,stroke:#cc5200,color:#fff
     style MINIO fill:#c72c48,stroke:#a12238,color:#fff
     style MINIO_INIT fill:#c72c48,stroke:#a12238,color:#fff
 ```
@@ -94,6 +98,7 @@ sequenceDiagram
     participant Django
     participant MinIO
     participant PostgreSQL
+    participant RabbitMQ
     participant Redis
     participant Celery
     participant Qdrant
@@ -104,13 +109,13 @@ sequenceDiagram
     MinIO-->>Django: File saved
     Django->>PostgreSQL: INSERT ImageMetadata (vectorized=False)
     PostgreSQL-->>Django: Record created
-    Django->>Redis: Dispatch generate_embedding task
-    Redis-->>Django: Task queued
+    Django->>RabbitMQ: Dispatch generate_embedding task
+    RabbitMQ-->>Django: Task queued
     Django-->>Nginx: 201 Created (metadata + presigned URL)
     Nginx-->>Client: JSON response
 
     Note over Celery,Qdrant: Async (seconds later)
-    Celery->>Redis: Pick up task
+    Celery->>RabbitMQ: Pick up task
     Celery->>MinIO: Read image bytes via S3 API
     MinIO-->>Celery: image bytes
     Celery->>Celery: EmbeddingModel.encode_from_bytes() → 2048-dim vector
@@ -294,7 +299,7 @@ PRP/
 ├── .env.example
 ├── .gitignore
 ├── ARCHITECTURE.md
-├── docker-compose.yml        # Service orchestration (8 containers)
+├── docker-compose.yml        # Service orchestration (9 containers)
 ├── Dockerfile                 # Multi-stage Python build (uv → runtime)
 ├── LICENSE
 ├── pyproject.toml             # Dependencies (uv-managed)
